@@ -16,11 +16,12 @@ namespace LordAshes
 {
     [BepInPlugin(Guid, "Character Sheets Plug-In", Version)]
     [BepInDependency(LordAshes.ChatRollerPlugin.Guid)]
+    [BepInDependency(RadialUI.RadialUIPlugin.Guid)]
     public class CharacterSheetsPlugin : BaseUnityPlugin
     {
         // Plugin info
         public const string Guid = "org.lordashes.plugins.charactersheets";
-        public const string Version = "1.0.0.0";
+        public const string Version = "1.0.1.0";
 
         // Configuration
         private ConfigEntry<KeyboardShortcut> triggerKeyEdition { get; set; }
@@ -34,6 +35,9 @@ namespace LordAshes
 
         // Character sheets style
         private string style = "Default";
+
+        // Creature with radial menu open
+        private CreatureGuid radialCreature = CreatureGuid.Empty;
 
         /// <summary>
         /// Function for initializing plugin
@@ -55,7 +59,37 @@ namespace LordAshes
             triggerKeyEdition = Config.Bind("Hotkeys", "Select Character Sheet Edition", new KeyboardShortcut(KeyCode.I, KeyCode.LeftControl));
             triggerKeyShow = Config.Bind("Hotkeys", "Open Character Sheet", new KeyboardShortcut(KeyCode.O, KeyCode.LeftControl));
 
+            // Set character sheet edition to default
             LordAshes.ChatRollerPlugin.SetEdition(style);
+
+            // Get icon for radial menu
+            Texture2D tex = new Texture2D(32, 32);
+            tex.LoadImage(System.IO.File.ReadAllBytes(dir + "Images/Icons/CharacterSheet.Png"));
+            Sprite icon = Sprite.Create(tex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
+
+            // Add option to mini radial menu
+            RadialUI.RadialUIPlugin.AddOnCharacter(Guid, new MapMenu.ItemArgs
+            {
+                Action = (mmi, obj) => { Show(); },
+                Icon = icon,
+                Title = "Character Sheet",
+                CloseMenuOnActivate = true
+            }, Reporter);
+
+            // Post plkugin on TaleSpire main page
+            StateDetection.Initialize(this.GetType());
+        }
+
+        /// <summary>
+        /// Method to track which asset has the radial menu open
+        /// </summary>
+        /// <param name="selected"></param>
+        /// <param name="radialMenu"></param>
+        /// <returns></returns>
+        private bool Reporter(NGuid selected, NGuid radialMenu)
+        {
+            radialCreature = new CreatureGuid(radialMenu);
+            return true;
         }
 
         /// <summary>
@@ -94,8 +128,8 @@ namespace LordAshes
             if(selected!=null)
             {
                 System.Windows.Forms.Form sheet = new System.Windows.Forms.Form();
-                sheet.Name = "Character Sheet_" + selected.Creature.Name;
-                sheet.Text = "Character Sheet: " + selected.Creature.Name;
+                sheet.Name = "Character Sheet_" + GetCreatureName(selected);
+                sheet.Text = "Character Sheet: " + GetCreatureName(selected);
                 UnityEngine.Debug.Log("Loading CharacterSheet Background from '" + dir + "Images/" + style + "CharacterSheet.png'");
                 System.Drawing.Image sheetImage = new System.Drawing.Bitmap(dir+"Images/"+style+"CharacterSheet.png");
                 sheet.BackgroundImage = sheetImage;
@@ -104,8 +138,8 @@ namespace LordAshes
                 sheet.Left = (UnityEngine.Screen.width - sheet.Width) / 2;
                 sheet.Top = (UnityEngine.Screen.height - sheet.Height) / 2;
                 replacements = new Dictionary<string, string>();
-                UnityEngine.Debug.Log("Loading CharacterSheet Data from '" + dir + "Misc/" + style + selected.Creature.Name + ".chs'");
-                string[] keyvals = System.IO.File.ReadAllLines(dir+"Misc/"+style+selected.Creature.Name+".chs");
+                UnityEngine.Debug.Log("Loading CharacterSheet Data from '" + dir + "Misc/" + style + GetCreatureName(selected) + ".chs'");
+                string[] keyvals = System.IO.File.ReadAllLines(dir+"Misc/"+style+ GetCreatureName(selected) +".chs");
                 foreach (string keyval in keyvals)
                 {
                     string[] parts = keyval.Split('=');
@@ -155,6 +189,13 @@ namespace LordAshes
                     sheet.BringToFront();
                 }
             }
+        }
+
+        private string GetCreatureName(CreatureBoardAsset asset)
+        {
+            string name = asset.Creature.Name;
+            if (name.Contains("<size=0>")) { name = name.Substring(0, name.IndexOf("<size=0>")).Trim(); }
+            return name;
         }
 
         private void LinkClick(Element el, CreatureBoardAsset selected)
