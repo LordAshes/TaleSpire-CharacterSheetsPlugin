@@ -1,19 +1,16 @@
 ﻿using UnityEngine;
-using UnityEngine.Rendering.PostProcessing;
 using BepInEx;
-using Bounce.Unmanaged;
 using System.Linq;
-using TMPro;
-using UnityEngine.UI;
-using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
 using System.Drawing;
 using Newtonsoft.Json;
 using System.Windows.Forms;
+using System;
 
 namespace LordAshes
 {
+
     [BepInPlugin(Guid, "Character Sheets Plug-In", Version)]
     [BepInDependency(LordAshes.ChatRollerPlugin.Guid)]
     [BepInDependency(RadialUI.RadialUIPlugin.Guid)]
@@ -21,10 +18,9 @@ namespace LordAshes
     {
         // Plugin info
         public const string Guid = "org.lordashes.plugins.charactersheets";
-        public const string Version = "1.0.1.0";
+        public const string Version = "1.1.0.0";
 
         // Configuration
-        private ConfigEntry<KeyboardShortcut> triggerKeyEdition { get; set; }
         private ConfigEntry<KeyboardShortcut> triggerKeyShow { get; set; }
 
         // Replacements
@@ -33,11 +29,11 @@ namespace LordAshes
         // Content directory
         private string dir = UnityEngine.Application.dataPath.Substring(0, UnityEngine.Application.dataPath.LastIndexOf("/")) + "/TaleSpire_CustomData/";
 
-        // Character sheets style
-        private string style = "Default";
+        // Edition
+        private string style = ChatRollerPlugin.GetEdition().Replace(".","");
 
-        // Creature with radial menu open
-        private CreatureGuid radialCreature = CreatureGuid.Empty;
+        // Cooldown
+        private Tuple<CreatureGuid, int> showMenu = null;
 
         /// <summary>
         /// Function for initializing plugin
@@ -56,40 +52,25 @@ namespace LordAshes
                 System.IO.Directory.CreateDirectory(dir + "Misc/");
             }
 
-            triggerKeyEdition = Config.Bind("Hotkeys", "Select Character Sheet Edition", new KeyboardShortcut(KeyCode.I, KeyCode.LeftControl));
             triggerKeyShow = Config.Bind("Hotkeys", "Open Character Sheet", new KeyboardShortcut(KeyCode.O, KeyCode.LeftControl));
 
-            // Set character sheet edition to default
-            LordAshes.ChatRollerPlugin.SetEdition(style);
+            // Add Info menu selection to main character menu
+            RadialUI.RadialSubmenu.EnsureMainMenuItem(RadialUI.RadialUIPlugin.Guid + ".Info",
+                                                        RadialUI.RadialSubmenu.MenuType.character,
+                                                        "Info",
+                                                        RadialUI.RadialSubmenu.GetIconFromFile(dir + "Images/Icons/Info.png")
+                                                     );
 
-            // Get icon for radial menu
-            Texture2D tex = new Texture2D(32, 32);
-            tex.LoadImage(System.IO.File.ReadAllBytes(dir + "Images/Icons/CharacterSheet.Png"));
-            Sprite icon = Sprite.Create(tex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
-
-            // Add option to mini radial menu
-            RadialUI.RadialUIPlugin.AddOnCharacter(Guid, new MapMenu.ItemArgs
-            {
-                Action = (mmi, obj) => { Show(); },
-                Icon = icon,
-                Title = "Character Sheet",
-                CloseMenuOnActivate = true
-            }, Reporter);
+            // Add Icons sub menu item
+            RadialUI.RadialSubmenu.CreateSubMenuItem(RadialUI.RadialUIPlugin.Guid + ".Info",
+                                                        "Character Sheet",
+                                                        RadialUI.RadialSubmenu.GetIconFromFile(dir + "Images/Icons/CharacterSheet.png"),
+                                                        Show,
+                                                        true
+                                                    );
 
             // Post plkugin on TaleSpire main page
             StateDetection.Initialize(this.GetType());
-        }
-
-        /// <summary>
-        /// Method to track which asset has the radial menu open
-        /// </summary>
-        /// <param name="selected"></param>
-        /// <param name="radialMenu"></param>
-        /// <returns></returns>
-        private bool Reporter(NGuid selected, NGuid radialMenu)
-        {
-            radialCreature = new CreatureGuid(radialMenu);
-            return true;
         }
 
         /// <summary>
@@ -100,46 +81,64 @@ namespace LordAshes
         {
             if(isBoardLoaded())
             {
-                if (triggerKeyEdition.Value.IsUp())
+                // Keyboard triggered character sheet
+                if (triggerKeyShow.Value.IsUp())
                 {
-                    SystemMessage.AskForTextInput("Character Sheet Style", "Please Enter The Edition:", "OK", (s)=> { if (s != "") { style = s + ".";  } else { style = ""; }; LordAshes.ChatRollerPlugin.SetEdition(s); }, null, "Cancel", null, "Default");
+                    Show(LocalClient.SelectedCreatureId);
                 }
-                else if (triggerKeyShow.Value.IsUp())
+
+                // Submenu triggered character sheet
+                if (showMenu!=null)
                 {
-                    Show();
+                    if(showMenu.Item2>0)
+                    {
+                        showMenu = new Tuple<CreatureGuid,int>(showMenu.Item1, showMenu.Item2 - 1);
+                    }
+                    else
+                    {
+                        Show(showMenu.Item1);
+                        showMenu = null;
+                    }
                 }
             }
         }
 
         /// <summary>
+        /// Method for radial menu selection which calls the Character Sheet show
+        /// </summary>
+        /// <param name="cid">Unused</param>
+        /// <param name="menu">Unused</param>
+        /// <param name="mmi">Unused</param>
+        void Show(CreatureGuid cid, string menu, MapMenuItem mmi)
+        {
+            SystemMessage.DisplayInfoText("Loading Chracter Sheet...");
+            showMenu = new Tuple<CreatureGuid, int>(cid,100);
+        }
+
+        /// <summary>
         /// Show character sheet
         /// </summary>
-        void Show()
+        void Show(CreatureGuid cid)
         {
+            Debug.Log("Creating Character Sheet...");
             CreatureBoardAsset selected = null;
-            foreach(CreatureBoardAsset asset in CreaturePresenter.AllCreatureAssets.ToArray())
-            {
-                if((NGuid)LocalClient.SelectedCreatureId.Value==asset.Creature.CreatureId.Value)
-                {
-                    selected = asset;
-                    break;
-                }
-            }
+            CreaturePresenter.TryGetAsset(cid, out selected);
             if(selected!=null)
             {
+                Debug.Log("Creating Character Sheet For '"+selected.Creature.Name+"'");
                 System.Windows.Forms.Form sheet = new System.Windows.Forms.Form();
-                sheet.Name = "Character Sheet_" + GetCreatureName(selected);
+                sheet.Name = "Character Sheet: " + GetCreatureName(selected);
                 sheet.Text = "Character Sheet: " + GetCreatureName(selected);
-                UnityEngine.Debug.Log("Loading CharacterSheet Background from '" + dir + "Images/" + style + "CharacterSheet.png'");
-                System.Drawing.Image sheetImage = new System.Drawing.Bitmap(dir+"Images/"+style+"CharacterSheet.png");
+                UnityEngine.Debug.Log("Loading CharacterSheet Background from '" + dir + "Images/"+style+".CharacterSheet.png'");
+                System.Drawing.Image sheetImage = new System.Drawing.Bitmap(dir+"Images/"+style+".CharacterSheet.png");
                 sheet.BackgroundImage = sheetImage;
                 sheet.Width = sheetImage.Width+15;
                 sheet.Height = sheetImage.Height+30;
                 sheet.Left = (UnityEngine.Screen.width - sheet.Width) / 2;
                 sheet.Top = (UnityEngine.Screen.height - sheet.Height) / 2;
                 replacements = new Dictionary<string, string>();
-                UnityEngine.Debug.Log("Loading CharacterSheet Data from '" + dir + "Misc/" + style + GetCreatureName(selected) + ".chs'");
-                string[] keyvals = System.IO.File.ReadAllLines(dir+"Misc/"+style+ GetCreatureName(selected) +".chs");
+                UnityEngine.Debug.Log("Loading CharacterSheet Data from '" + dir + "Misc/" + style+"."+GetCreatureName(selected) + ".chs'");
+                string[] keyvals = System.IO.File.ReadAllLines(dir+"Misc/" + style+"."+GetCreatureName(selected) +".chs");
                 foreach (string keyval in keyvals)
                 {
                     string[] parts = keyval.Split('=');
@@ -148,8 +147,8 @@ namespace LordAshes
                         replacements.Add(parts[0], parts[1]);
                     }
                 }
-                UnityEngine.Debug.Log("Loading CharacterSheet Data from '" + dir + "Misc/" + style + "CharacterSheetLayout.json'");
-                string json = System.IO.File.ReadAllText(dir + "Misc/" + style + "CharacterSheetLayout.json");
+                UnityEngine.Debug.Log("Loading CharacterSheet Data from '" + dir + "Misc/" +style+".CharacterSheetLayout.json'");
+                string json = System.IO.File.ReadAllText(dir + "Misc/" +style+ ".CharacterSheetLayout.json");
                 Element[] contents = JsonConvert.DeserializeObject<Element[]>(json);
                 foreach (Element el in contents)
                 {
@@ -186,7 +185,7 @@ namespace LordAshes
                     sheet.Enabled = true;
                     sheet.Visible = true;
                     sheet.Show();
-                    sheet.BringToFront();
+                    sheet.SendToBack();
                 }
             }
         }
@@ -200,7 +199,7 @@ namespace LordAshes
 
         private void LinkClick(Element el, CreatureBoardAsset selected)
         {
-            ChatManager.SendChatMessage("@ " + el.roll, selected.Creature.CreatureId.Value);
+            ChatRollerPlugin.RollHandler.ProcessRollRequest(selected.Creature.CreatureId, el.roll);
         }
 
         /// <summary>
