@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.Windows.Forms;
 using System;
 using System.Collections;
+using System.Text.RegularExpressions;
 
 namespace LordAshes
 {
@@ -19,7 +20,7 @@ namespace LordAshes
     {
         // Plugin info
         public const string Guid = "org.lordashes.plugins.charactersheets";
-        public const string Version = "1.3.0.0";
+        public const string Version = "1.3.1.0";
 
         // Configuration
         public enum RollMode
@@ -202,30 +203,9 @@ namespace LordAshes
                 string expandedRoll = "{"+el.roll+"}";
 
                 Debug.Log("Character Sheet Plugin: Roll = " + expandedRoll);
-                while(expandedRoll.Contains("{"))
-                {
-                    string key = expandedRoll.Substring(expandedRoll.IndexOf("{") + 1);
-                    key = key.Substring(0, key.IndexOf("}"));
-                    Debug.Log("Character Sheet: Key = " + key);
-                    bool found = false;
-                    foreach (KeyValuePair<string, string> spec in replacements)
-                    {
-                        Debug.Log("Character Sheet: Key = '" + key + "' vs Stat '" + spec.Key + "'");
-                        if ((spec.Key == key) || (spec.Key == ("{" + key + "}")))
-                        {
-                            expandedRoll = expandedRoll.Replace("{" + key + "}", spec.Value);
-                            found = true;
-                            break;
-                        }
-                    }
-                    Debug.Log("Character Sheet Plugin: Roll = " + expandedRoll);
-                    if (!found) { break; }
-                }
-                while(expandedRoll.StartsWith("{") && expandedRoll.EndsWith("}"))
-                {
-                    expandedRoll = expandedRoll.Substring(1);
-                    expandedRoll = expandedRoll.Substring(0,expandedRoll.Length-1);
-                }
+
+                expandedRoll = MakeReplacements("{" + el.roll + "}");
+                if(expandedRoll== "{" + el.roll + "}") { expandedRoll = MakeReplacements(el.roll); }
 
                 Debug.Log("Character Sheet Plugin: Rolling '" + el.text.Replace(" ", " ") + " " + expandedRoll + "'");
                 if (Config.Bind("Settings", "Roll Method", RollMode.ChatRollMode).Value == RollMode.ChatRollMode)
@@ -235,21 +215,69 @@ namespace LordAshes
                 }
                 else
                 {
-                    Debug.Log("Character Sheet Plugin: Processing Via Talespire Protocol");
-                    string cmd = "talespire://dice/" + el.text.Replace(" ", " ") + ":" + expandedRoll;
-                    System.Diagnostics.Process process = new System.Diagnostics.Process()
+                    Regex reg1 = new Regex(@"^[0-9]+D[0-9]+[\+\-][0-9]+[\+\-][0-9]+$");
+                    Regex reg2 = new Regex(@"^[0-9]+D[0-9]+[\+\-][0-9]+$");
+                    Regex reg3 = new Regex(@"^[0-9]+$");
+                    Debug.Log("RegExMatch (Multi Mod):    " + reg1.IsMatch(expandedRoll));
+                    Debug.Log("RegExMatch (Regular Roll): " + reg2.IsMatch(expandedRoll));
+                    Debug.Log("RegExMatch (Static Stat):  " + reg3.IsMatch(expandedRoll));
+                    if (reg1.IsMatch(expandedRoll))
                     {
-                        StartInfo = new System.Diagnostics.ProcessStartInfo()
+                        SystemMessage.DisplayInfoText("Talespire Dice Protocol\r\nSupports Only One Modifier.");
+                        SystemMessage.DisplayInfoText("Please Fix Character Sheet For '" + (selected.Creature.Name + "<").Substring(0, (selected.Creature.Name + "<").IndexOf("<")) + "'");
+                    }
+                    else if (reg2.IsMatch(expandedRoll))
+                    {
+                        Debug.Log("Character Sheet Plugin: Processing Via Talespire Protocol");
+                        string cmd = "talespire://dice/" + el.text.Replace(" ", " ") + ":" + expandedRoll;
+                        System.Diagnostics.Process process = new System.Diagnostics.Process()
                         {
-                            FileName = cmd,
-                            Arguments = "",
-                            CreateNoWindow = true
-                        }
-                    };
-                    process.Start();
+                            StartInfo = new System.Diagnostics.ProcessStartInfo()
+                            {
+                                FileName = cmd,
+                                Arguments = "",
+                                CreateNoWindow = true
+                            }
+                        };
+                        process.Start();
+                    }
+                    else if (reg3.IsMatch(expandedRoll))
+                    {
+                        SystemMessage.DisplayInfoText("Selected Stat Is Static Not A Roll.");
+                        SystemMessage.DisplayInfoText(((el.text.Trim()!="")? el.text.Trim() : el.roll.Replace("{","").Replace("}",""))+ " is "+expandedRoll);
+                    }
+                    else
+                    {
+                        SystemMessage.DisplayInfoText("Roll '"+expandedRoll+"' Not Supported.");
+                    }
                 }
             }
             catch (Exception) { ; }
+        }
+
+        public string MakeReplacements(string expandedRoll)
+        {
+            while (expandedRoll.Contains("{"))
+            {
+                string key = expandedRoll.Substring(expandedRoll.IndexOf("{") + 1);
+                key = key.Substring(0, key.IndexOf("}"));
+                Debug.Log("Character Sheet: Key = " + key);
+                bool found = false;
+                foreach (KeyValuePair<string, string> spec in replacements)
+                {
+                    Debug.Log("Character Sheet: Key = '" + key + "' vs Stat '" + spec.Key + "'");
+                    if ((spec.Key == key) || (spec.Key == ("{" + key + "}")))
+                    {
+                        expandedRoll = expandedRoll.Replace("{" + key + "}", spec.Value);
+                        found = true;
+                        break;
+                    }
+                }
+                expandedRoll = expandedRoll.Replace("+-", "-").Replace("-+", "-").Replace("++", "+").Replace("--", "-");
+                Debug.Log("Character Sheet Plugin: Roll = " + expandedRoll);
+                if (!found) { break; }
+            }
+            return expandedRoll;
         }
 
         /// <summary>
