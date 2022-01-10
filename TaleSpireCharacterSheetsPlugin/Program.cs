@@ -7,6 +7,7 @@ using System.Drawing;
 using Newtonsoft.Json;
 using System.Windows.Forms;
 using System;
+using System.Collections;
 
 namespace LordAshes
 {
@@ -18,9 +19,14 @@ namespace LordAshes
     {
         // Plugin info
         public const string Guid = "org.lordashes.plugins.charactersheets";
-        public const string Version = "1.2.0.0";
+        public const string Version = "1.3.0.0";
 
         // Configuration
+        public enum RollMode
+        {
+            ChatRollMode = 0,
+            TalespireDice = 1
+        }
         private ConfigEntry<KeyboardShortcut> triggerKeyShow { get; set; }
 
         // Replacements
@@ -221,7 +227,27 @@ namespace LordAshes
                     expandedRoll = expandedRoll.Substring(0,expandedRoll.Length-1);
                 }
 
-                ChatManager.SendChatMessage("/rn " + el.text.Replace(" "," ") + " " + expandedRoll, selected.Creature.CreatureId.Value); // SPC => ALT255
+                Debug.Log("Character Sheet Plugin: Rolling '" + el.text.Replace(" ", " ") + " " + expandedRoll + "'");
+                if (Config.Bind("Settings", "Roll Method", RollMode.ChatRollMode).Value == RollMode.ChatRollMode)
+                {
+                    Debug.Log("Character Sheet Plugin: Processing Via Chat Roller");
+                    ChatManager.SendChatMessage("/rn " + el.text.Replace(" ", " ") + " " + expandedRoll, selected.Creature.CreatureId.Value); // SPC => ALT255
+                }
+                else
+                {
+                    Debug.Log("Character Sheet Plugin: Processing Via Talespire Protocol");
+                    string cmd = "talespire://dice/" + el.text.Replace(" ", " ") + ":" + expandedRoll;
+                    System.Diagnostics.Process process = new System.Diagnostics.Process()
+                    {
+                        StartInfo = new System.Diagnostics.ProcessStartInfo()
+                        {
+                            FileName = cmd,
+                            Arguments = "",
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                }
             }
             catch (Exception) { ; }
         }
