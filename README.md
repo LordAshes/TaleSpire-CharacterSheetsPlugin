@@ -10,6 +10,9 @@ Note: Preview shows a D&D 5E character sheet but any plugin allows defining syst
 
 ## Change Log
 
+```
+1.3.1: Fixed issue with negative modifiers.
+1.3.1: Added format checks and display messahes if roll format is not compatible with selected roll method.
 1.3.0: Added option for ChatRoll based rolls (like before) or Talespire Dice rolls.
 1.3.0: ChatRoll Plugin is no longer a forced dependency since you may use Talespire Dice instead.
 1.2.0: Improved stats lookup so that partial names will not get replaced (e.g. WIS won't replace WIS_Save)
@@ -18,6 +21,7 @@ Note: Preview shows a D&D 5E character sheet but any plugin allows defining syst
 1.1.0: Access is now available from the mini's radial menu using the Info icon and then Character Sheets icon.
 1.0.1: Posted plugin on the TaleSpire main page
 1.0.0: Initial release
+```
 
 ## Install
 
@@ -67,12 +71,14 @@ with one layout file per edition. The name of the file is *edition*.CharacterShe
 Dnd5e.CharacterSheetLayout.json. The file is located in the TaleSpire_CustomData/Misc folder.
 The contents of the file are an array of visual elements. Each element can have the following properties:
 
+```
 name: The name of the visual element. Determines what keyword to look up in the character sheet to use as the display value.
 text: Text to be displayed before the character sheet lookup value (e.g. skill name before the skill modifier). Default blank.
 roll: The entry types into the chat for rolling.
 position: x,y coordinates of the element on the character sheet.
 size: Font size to be used when displaying the text and value.
 width: Number of characters that the text and value is set to. Text is left aligned, value is right aligned.
+```
 
 {USERSLOT*n*}, {USERSLOT*n*_NAME} and {USERSLOT*n*_ROLL} are special entries which allow the common character sheet layout to
 be used be individual characters. A fighter may use the slots for various weapon attack rolls and damage rolls while a
