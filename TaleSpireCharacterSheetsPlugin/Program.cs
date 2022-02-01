@@ -20,7 +20,7 @@ namespace LordAshes
     {
         // Plugin info
         public const string Guid = "org.lordashes.plugins.charactersheets";
-        public const string Version = "1.3.1.0";
+        public const string Version = "1.4.0.0";
 
         // Configuration
         public enum RollMode
@@ -200,55 +200,59 @@ namespace LordAshes
         {
             try
             {
-                string expandedRoll = "{"+el.roll+"}";
-
-                Debug.Log("Character Sheet Plugin: Roll = " + expandedRoll);
-
-                expandedRoll = MakeReplacements("{" + el.roll + "}");
-                if(expandedRoll== "{" + el.roll + "}") { expandedRoll = MakeReplacements(el.roll); }
-
-                Debug.Log("Character Sheet Plugin: Rolling '" + el.text.Replace(" ", " ") + " " + expandedRoll + "'");
-                if (Config.Bind("Settings", "Roll Method", RollMode.ChatRollMode).Value == RollMode.ChatRollMode)
+                if (el.roll.StartsWith("/"))
                 {
-                    Debug.Log("Character Sheet Plugin: Processing Via Chat Roller");
-                    ChatManager.SendChatMessage("/rn " + el.text.Replace(" ", " ") + " " + expandedRoll, selected.Creature.CreatureId.Value); // SPC => ALT255
+                    ChatManager.SendChatMessage(el.roll, selected.Creature.CreatureId.Value);
                 }
                 else
                 {
-                    Regex reg1 = new Regex(@"^[0-9]+D[0-9]+[\+\-][0-9]+[\+\-][0-9]+$");
-                    Regex reg2 = new Regex(@"^[0-9]+D[0-9]+[\+\-][0-9]+$");
-                    Regex reg3 = new Regex(@"^[0-9]+$");
-                    Debug.Log("RegExMatch (Multi Mod):    " + reg1.IsMatch(expandedRoll));
-                    Debug.Log("RegExMatch (Regular Roll): " + reg2.IsMatch(expandedRoll));
-                    Debug.Log("RegExMatch (Static Stat):  " + reg3.IsMatch(expandedRoll));
-                    if (reg1.IsMatch(expandedRoll))
+                    string expandedRoll = "{" + el.roll + "}";
+
+                    Debug.Log("Character Sheet Plugin: Roll = " + expandedRoll);
+
+                    expandedRoll = MakeReplacements("{" + el.roll + "}");
+                    if (expandedRoll == "{" + el.roll + "}") { expandedRoll = MakeReplacements(el.roll); }
+
+                    Debug.Log("Character Sheet Plugin: Rolling '" + el.text.Replace(" ", " ") + " " + expandedRoll + "'");
+                    if (Config.Bind("Settings", "Roll Method", RollMode.ChatRollMode).Value == RollMode.ChatRollMode)
                     {
-                        SystemMessage.DisplayInfoText("Talespire Dice Protocol\r\nSupports Only One Modifier.");
-                        SystemMessage.DisplayInfoText("Please Fix Character Sheet For '" + (selected.Creature.Name + "<").Substring(0, (selected.Creature.Name + "<").IndexOf("<")) + "'");
-                    }
-                    else if (reg2.IsMatch(expandedRoll))
-                    {
-                        Debug.Log("Character Sheet Plugin: Processing Via Talespire Protocol");
-                        string cmd = "talespire://dice/" + el.text.Replace(" ", " ") + ":" + expandedRoll;
-                        System.Diagnostics.Process process = new System.Diagnostics.Process()
-                        {
-                            StartInfo = new System.Diagnostics.ProcessStartInfo()
-                            {
-                                FileName = cmd,
-                                Arguments = "",
-                                CreateNoWindow = true
-                            }
-                        };
-                        process.Start();
-                    }
-                    else if (reg3.IsMatch(expandedRoll))
-                    {
-                        SystemMessage.DisplayInfoText("Selected Stat Is Static Not A Roll.");
-                        SystemMessage.DisplayInfoText(((el.text.Trim()!="")? el.text.Trim() : el.roll.Replace("{","").Replace("}",""))+ " is "+expandedRoll);
+                        Debug.Log("Character Sheet Plugin: Processing Via Chat Roller");
+                        ChatManager.SendChatMessage("/rn " + el.text.Replace(" ", " ") + " " + expandedRoll, selected.Creature.CreatureId.Value); // SPC => ALT255
                     }
                     else
                     {
-                        SystemMessage.DisplayInfoText("Roll '"+expandedRoll+"' Not Supported.");
+                        Regex reg1 = new Regex(@"^[0-9]+D[0-9]+[\+\-][0-9]+[\+\-][0-9]+$");
+                        Regex reg2 = new Regex(@"^[0-9]+D[0-9]+[\+\-][0-9]+$");
+                        Regex reg3 = new Regex(@"^[0-9]+$");
+                        if (reg1.IsMatch(expandedRoll))
+                        {
+                            SystemMessage.DisplayInfoText("Talespire Dice Protocol\r\nSupports Only One Modifier.");
+                            SystemMessage.DisplayInfoText("Please Fix Character Sheet For '" + (selected.Creature.Name + "<").Substring(0, (selected.Creature.Name + "<").IndexOf("<")) + "'");
+                        }
+                        else if (reg2.IsMatch(expandedRoll))
+                        {
+                            Debug.Log("Character Sheet Plugin: Processing Via Talespire Protocol");
+                            string cmd = "talespire://dice/" + el.text.Replace(" ", " ") + ":" + expandedRoll;
+                            System.Diagnostics.Process process = new System.Diagnostics.Process()
+                            {
+                                StartInfo = new System.Diagnostics.ProcessStartInfo()
+                                {
+                                    FileName = cmd,
+                                    Arguments = "",
+                                    CreateNoWindow = true
+                                }
+                            };
+                            process.Start();
+                        }
+                        else if (reg3.IsMatch(expandedRoll))
+                        {
+                            SystemMessage.DisplayInfoText("Selected Stat Is Static Not A Roll.");
+                            SystemMessage.DisplayInfoText(((el.text.Trim() != "") ? el.text.Trim() : el.roll.Replace("{", "").Replace("}", "")) + " is " + expandedRoll);
+                        }
+                        else
+                        {
+                            SystemMessage.DisplayInfoText("Roll '" + expandedRoll + "' Not Supported.");
+                        }
                     }
                 }
             }
