@@ -11,6 +11,7 @@ Note: Preview shows a D&D 5E character sheet but any plugin allows defining syst
 ## Change Log
 
 ```
+2.0.0: Fix for BR HF Integration update.
 1.3.1: Fixed issue with negative modifiers.
 1.3.1: Added format checks and display messahes if roll format is not compatible with selected roll method.
 1.3.0: Added option for ChatRoll based rolls (like before) or Talespire Dice rolls.
