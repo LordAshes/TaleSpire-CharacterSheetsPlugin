@@ -20,7 +20,7 @@ namespace LordAshes
     {
         // Plugin info
         public const string Guid = "org.lordashes.plugins.charactersheets";
-        public const string Version = "1.4.0.0";
+        public const string Version = "2.0.0.0";
 
         // Configuration
         public enum RollMode
@@ -70,7 +70,7 @@ namespace LordAshes
         }
 
         /// <summary>
-        /// Function for determining if view mode has been toggled and, if so, activating or deactivating Character View mode.
+        /// Function for determining if view mode has been toggled and, if so, activating or deactivating Character Sheet mode.
         /// This function is called periodically by TaleSpire.
         /// </summary>
         void Update()
@@ -121,7 +121,7 @@ namespace LordAshes
             CreaturePresenter.TryGetAsset(cid, out selected);
             if(selected!=null)
             {
-                Debug.Log("Creating Character Sheet For '"+selected.Creature.Name+"'");
+                Debug.Log("Creating Character Sheet For '"+selected.Name+"'");
                 System.Windows.Forms.Form sheet = new System.Windows.Forms.Form();
                 sheet.Name = "Character Sheet: " + GetCreatureName(selected);
                 sheet.Text = "Character Sheet: " + GetCreatureName(selected);
@@ -191,7 +191,7 @@ namespace LordAshes
 
         private string GetCreatureName(CreatureBoardAsset asset)
         {
-            string name = asset.Creature.Name;
+            string name = asset.Name;
             if (name.Contains("<size=0>")) { name = name.Substring(0, name.IndexOf("<size=0>")).Trim(); }
             return name;
         }
@@ -202,7 +202,7 @@ namespace LordAshes
             {
                 if (el.roll.StartsWith("/"))
                 {
-                    ChatManager.SendChatMessage(el.roll, selected.Creature.CreatureId.Value);
+                    ChatManager.SendChatMessage(el.roll, selected.CreatureId.Value);
                 }
                 else
                 {
@@ -217,7 +217,7 @@ namespace LordAshes
                     if (Config.Bind("Settings", "Roll Method", RollMode.ChatRollMode).Value == RollMode.ChatRollMode)
                     {
                         Debug.Log("Character Sheet Plugin: Processing Via Chat Roller");
-                        ChatManager.SendChatMessage("/rn " + el.text.Replace(" ", " ") + " " + expandedRoll, selected.Creature.CreatureId.Value); // SPC => ALT255
+                        ChatManager.SendChatMessage("/rn " + el.text.Replace(" ", " ") + " " + expandedRoll, selected.CreatureId.Value); // SPC => ALT255
                     }
                     else
                     {
@@ -227,7 +227,7 @@ namespace LordAshes
                         if (reg1.IsMatch(expandedRoll))
                         {
                             SystemMessage.DisplayInfoText("Talespire Dice Protocol\r\nSupports Only One Modifier.");
-                            SystemMessage.DisplayInfoText("Please Fix Character Sheet For '" + (selected.Creature.Name + "<").Substring(0, (selected.Creature.Name + "<").IndexOf("<")) + "'");
+                            SystemMessage.DisplayInfoText("Please Fix Character Sheet For '" + (selected.Name + "<").Substring(0, (selected.Name + "<").IndexOf("<")) + "'");
                         }
                         else if (reg2.IsMatch(expandedRoll))
                         {
