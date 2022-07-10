@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using System;
 using System.Collections;
 using System.Text.RegularExpressions;
+using System.Data;
 
 namespace LordAshes
 {
@@ -20,7 +21,7 @@ namespace LordAshes
     {
         // Plugin info
         public const string Guid = "org.lordashes.plugins.charactersheets";
-        public const string Version = "2.0.0.0";
+        public const string Version = "2.1.0.0";
 
         // Configuration
         public enum RollMode
@@ -29,12 +30,13 @@ namespace LordAshes
             TalespireDice = 1
         }
         private ConfigEntry<KeyboardShortcut> triggerKeyShow { get; set; }
+        private ConfigEntry<KeyboardShortcut> triggerKeyEdition { get; set; }
 
         // Replacements
         Dictionary<string, string> replacements = null;
 
         // Edition
-        private string style = "Dnd5e".Replace(".","");
+        private string edition = "Dnd5e".Replace(".","");
 
         // Cooldown
         private Tuple<CreatureGuid, int> showMenu = null;
@@ -48,7 +50,9 @@ namespace LordAshes
             UnityEngine.Debug.Log("Character Sheets Plugin: Active.");
 
             triggerKeyShow = Config.Bind("Hotkeys", "Open Character Sheet", new KeyboardShortcut(KeyCode.O, KeyCode.LeftControl));
-            style = Config.Bind("Setting", "Edition", "Dnd5e").Value;
+            triggerKeyEdition = Config.Bind("Hotkeys", "Change Edition", new KeyboardShortcut(KeyCode.I, KeyCode.RightControl));
+            edition = Config.Bind("Settings", "Default Edition", "Dnd5e").Value;
+            edition = Config.Bind("Setting", "Edition", "Dnd5e").Value;
 
             // Add Info menu selection to main character menu
             RadialUI.RadialSubmenu.EnsureMainMenuItem(RadialUI.RadialUIPlugin.Guid + ".Info",
@@ -96,6 +100,15 @@ namespace LordAshes
                         showMenu = null;
                     }
                 }
+
+                // Change Edition
+                if (triggerKeyEdition.Value.IsUp())
+                {
+                    SystemMessage.AskForPasswordInput("Edition", "Edition Name:", "Set", (ed) => 
+                    {
+                        edition = ed;
+                    }, null, "Cancel", null, edition);
+                }
             }
         }
 
@@ -125,18 +138,60 @@ namespace LordAshes
                 System.Windows.Forms.Form sheet = new System.Windows.Forms.Form();
                 sheet.Name = "Character Sheet: " + GetCreatureName(selected);
                 sheet.Text = "Character Sheet: " + GetCreatureName(selected);
-                string location = FileAccessPlugin.File.Find("Images/" + style + ".CharacterSheet.png")[0];
-                UnityEngine.Debug.Log("Character Sheets Plugin: Loading CharacterSheet Background from '" + location + "'");
-                System.Drawing.Image sheetImage = new System.Drawing.Bitmap(location);
+                string location = "";
+                try
+                {
+                    location = FileAccessPlugin.File.Find("Images/" + edition + ".CharacterSheet.png")[0];
+                    UnityEngine.Debug.Log("Character Sheets Plugin: Loading CharacterSheet Background from '" + location + "'");
+                }
+                catch (Exception x)
+                {
+                    Debug.LogWarning("Character Sheets Plugin: Unable to find 'Images/" + edition + ".CharacterSheet.png'");
+                    Debug.LogException(x);
+                    return;
+                }
+                System.Drawing.Image sheetImage = null;
+                try
+                {
+                    sheetImage = new System.Drawing.Bitmap(location);
+                    Debug.Log("Character Sheets Plugin: Background Image Loaded");
+                }
+                catch (Exception x)
+                {
+                    Debug.LogWarning("Character Sheets Plugin: Unable to load '"+location+"'");
+                    Debug.LogException(x);
+                    return;
+                }
+                Debug.Log("Character Sheets Plugin: Building Form");
                 sheet.BackgroundImage = sheetImage;
                 sheet.Width = sheetImage.Width+15;
                 sheet.Height = sheetImage.Height+30;
                 sheet.Left = (UnityEngine.Screen.width - sheet.Width) / 2;
                 sheet.Top = (UnityEngine.Screen.height - sheet.Height) / 2;
                 replacements = new Dictionary<string, string>();
-                location = FileAccessPlugin.File.Find("Misc/" + style + "." + GetCreatureName(selected) + ".chs")[0];
-                UnityEngine.Debug.Log("Character Sheets Plugin: Loading CharacterSheet Data from '" + location +"'");
-                string[] keyvals = System.IO.File.ReadAllLines(location);
+                try
+                {
+                    location = FileAccessPlugin.File.Find("Misc/" + edition + "." + GetCreatureName(selected) + ".chs")[0];
+                    UnityEngine.Debug.Log("Character Sheets Plugin: Loading CharacterSheet Data from '" + location + "'");
+                }
+                catch (Exception x)
+                {
+                    Debug.LogWarning("Character Sheets Plugin: Unable to find 'Misc/" + edition + "." + GetCreatureName(selected) + ".chs'");
+                    Debug.LogException(x);
+                    return;
+                }
+                string[] keyvals = null;
+                try
+                {
+                    keyvals = System.IO.File.ReadAllLines(location);
+                    UnityEngine.Debug.Log("Character Sheets Plugin: Loaded CharacterSheet Data from '" + location + "'");
+                }
+                catch (Exception x)
+                {
+                    Debug.LogWarning("Character Sheets Plugin: Unable to load '"+location+"'");
+                    Debug.LogException(x);
+                    return;
+                }
                 foreach (string keyval in keyvals)
                 {
                     string[] parts = keyval.Split('=');
@@ -145,10 +200,42 @@ namespace LordAshes
                         replacements.Add(parts[0], parts[1]);
                     }
                 }
-                location = FileAccessPlugin.File.Find("Misc/" + style + ".CharacterSheetLayout.json")[0];
-                UnityEngine.Debug.Log("Character Sheets Plugin: Loading CharacterSheet Layout from '" + location +"'");
-                string json = System.IO.File.ReadAllText(location);
-                Element[] contents = JsonConvert.DeserializeObject<Element[]>(json);
+                try
+                {
+                    location = FileAccessPlugin.File.Find("Misc/" + edition + ".CharacterSheetLayout.json")[0];
+                    UnityEngine.Debug.Log("Character Sheets Plugin: Loading CharacterSheet Layout from '" + location + "'");
+                }
+                catch (Exception x)
+                {
+                    Debug.LogWarning("Character Sheets Plugin: Unable to find 'Misc/" + edition + ".CharacterSheetLayout.json'");
+                    Debug.LogException(x);
+                    return;
+                }
+                string json = "";
+                try
+                {
+                    json = System.IO.File.ReadAllText(location);
+                    UnityEngine.Debug.Log("Character Sheets Plugin: Loaded CharacterSheet Layout from '" + location + "'");
+                }
+                catch (Exception x)
+                {
+                    Debug.LogWarning("Character Sheets Plugin: Unable to load '" + location + "'");
+                    Debug.LogException(x);
+                    return;
+                }
+                Element[] contents = null;
+                try
+                {
+                    contents = JsonConvert.DeserializeObject<Element[]>(json);
+                    UnityEngine.Debug.Log("Character Sheets Plugin: Understood CharacterSheet Layout from '" + location + "'");
+                }
+                catch (Exception x)
+                {
+                    Debug.LogWarning("Character Sheets Plugin: Error In Json Encoding. Unable To Deserialize '" + location + "'");
+                    Debug.LogException(x);
+                    return;
+                }
+                Debug.Log("Character Sheets Plugin: Data Loaded. Building Form Contents.");
                 foreach (Element el in contents)
                 {
                     Label item = new Label();
@@ -213,6 +300,8 @@ namespace LordAshes
                     expandedRoll = MakeReplacements("{" + el.roll + "}");
                     if (expandedRoll == "{" + el.roll + "}") { expandedRoll = MakeReplacements(el.roll); }
 
+                    expandedRoll = Combine(expandedRoll);
+
                     Debug.Log("Character Sheet Plugin: Rolling '" + el.text.Replace(" ", " ") + " " + expandedRoll + "'");
                     if (Config.Bind("Settings", "Roll Method", RollMode.ChatRollMode).Value == RollMode.ChatRollMode)
                     {
@@ -231,8 +320,8 @@ namespace LordAshes
                         }
                         else if (reg2.IsMatch(expandedRoll))
                         {
-                            Debug.Log("Character Sheet Plugin: Processing Via Talespire Protocol");
                             string cmd = "talespire://dice/" + el.text.Replace(" ", " ") + ":" + expandedRoll;
+                            Debug.Log("Character Sheet Plugin: Processing Via Talespire Protocol = "+cmd);
                             System.Diagnostics.Process process = new System.Diagnostics.Process()
                             {
                                 StartInfo = new System.Diagnostics.ProcessStartInfo()
@@ -284,6 +373,34 @@ namespace LordAshes
             return expandedRoll;
         }
 
+        public string Combine(string formula)
+        {
+            try
+            {
+                Debug.Log("Character Sheet Plugin: Pre-Combine Roll = " + formula);
+                if (formula.Contains("("))
+                {
+                    string sL = formula.Substring(0, formula.IndexOf("(") - 1);
+                    string key = formula.Substring(formula.IndexOf("("));
+                    key = key.Substring(0, key.IndexOf(")")+1);
+                    string sR = formula.Substring(formula.IndexOf(")") + 1);
+                    Debug.Log("Character Sheet Plugin: Combinable Segment = " + key);
+                    DataTable dt = new DataTable();
+                    string result = Convert.ToString(dt.Compute(key, null));
+                    Debug.Log("Character Sheet Plugin: Combined Segment = " + result);
+                    formula = formula.Replace(key, result);
+                    Debug.Log("Character Sheet Plugin: Combined Roll = " + formula);
+                }
+                Debug.Log("Character Sheet Plugin: Post-Combine Roll = " + formula);
+            }
+            catch(Exception x)
+            {
+                Debug.Log("Character Sheet Plugin: Exception");
+                Debug.LogException(x);
+            }
+            return formula;
+        }
+
         /// <summary>
         /// Function to check if the board is loaded
         /// </summary>
@@ -306,7 +423,7 @@ namespace LordAshes
             public string roll { get; set; } = "";
             public int width { get; set; } = -1;
         }
-
     }
 }
+
 
